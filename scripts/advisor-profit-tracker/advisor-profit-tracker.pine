@@ -1,0 +1,5 @@
+//@version=5
+indicator("Advisor Profit Tracker", overlay=true)
+
+// This script tracks and displays profit/loss information
+// TODO: Add implementation details
