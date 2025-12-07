@@ -1,5 +1,65 @@
 //@version=5
-indicator("Advisor Profit Tracker", overlay=true)
+indicator("Advisor Universal Portfolio", overlay=true)
 
-// This script tracks and displays profit/loss information
-// TODO: Add implementation details
+// --- SETTINGS ---
+// This creates a text box in your Settings menu.
+// You paste your "Ticker:Price" list here.
+portfolio_string = input.text_area(
+     defval="TSLA:279, NVDA:135.50, AAPL:180, BMNR:34", 
+     title="Portfolio Data", 
+     tooltip="Format: TICKER:PRICE, TICKER:PRICE\nExample: TSLA:200, NVDA:450"
+     )
+
+show_labels = input.bool(true, "Show Labels")
+
+// --- PARSING LOGIC (The Brains) ---
+// This function searches your text string for the current ticker
+get_my_price(data_str) =>
+    float price_found = 0.0
+    // 1. Clean the string (remove spaces) so "TSLA : 200" works same as "TSLA:200"
+    clean_data = str.replace_all(data_str, " ", "")
+    
+    // 2. Split the list by commas into individual items
+    items = str.split(clean_data, ",")
+    
+    // 3. Loop through items to find the one matching the current chart
+    for item in items
+        // Split "TSLA:279" into ["TSLA", "279"]
+        pair = str.split(item, ":")
+        
+        // Safety check: ensure we have exactly 2 parts (Ticker and Price)
+        if array.size(pair) == 2
+            ticker_in_list = array.get(pair, 0)
+            price_in_list = array.get(pair, 1)
+            
+            // If the ticker matches the chart, save the price
+            if ticker_in_list == syminfo.ticker
+                price_found := str.tonumber(price_in_list)
+    price_found
+
+// --- GET PRICE ---
+avg_price = get_my_price(portfolio_string)
+
+// --- CALCULATE LEVELS ---
+level_20 = avg_price * 1.20
+level_50 = avg_price * 1.50
+level_100 = avg_price * 2.00
+
+// --- PLOT LINES ---
+// Only draw lines if we found a price for this ticker
+plot(avg_price > 0 ? avg_price : na, "Average Price", color=color.white, linewidth=1, style=plot.style_circles)
+plot(avg_price > 0 ? level_20 : na, "+20% Target", color=color.yellow, style=plot.style_circles)
+plot(avg_price > 0 ? level_50 : na, "+50% Target", color=color.orange, linewidth=2)
+plot(avg_price > 0 ? level_100 : na, "Free Ride (2x)", color=color.green, linewidth=3)
+
+// --- ALERTS ---
+// Use {{ticker}} placeholder so the alert works for ANY stock
+alertcondition(ta.crossover(close, level_20), title="20% Gain", message="Advisor Alert: {{ticker}} is up 20%")
+alertcondition(ta.crossover(close, level_50), title="50% Gain", message="Advisor Alert: {{ticker}} is up 50% (Secure Half)")
+alertcondition(ta.crossover(close, level_100), title="100% Gain", message="Advisor Alert: {{ticker}} has doubled (Free Ride)")
+
+// --- LABELS ---
+if show_labels and barstate.islast and avg_price > 0
+    label.new(bar_index, avg_price, "Avg: " + str.tostring(avg_price, "#.##"), style=label.style_label_left, color=color.gray, textcolor=color.white)
+    label.new(bar_index, level_50, "+50%: " + str.tostring(level_50, "#.##"), style=label.style_label_left, color=color.orange, textcolor=color.white)
+    label.new(bar_index, level_100, "Free Ride: " + str.tostring(level_100, "#.##"), style=label.style_label_left, color=color.green, textcolor=color.white)
